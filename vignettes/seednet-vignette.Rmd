@@ -1,0 +1,181 @@
+---
+title: "Use cases for seednet package"
+author: "Ganna Androsova"
+date: "`r Sys.Date()`"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Vignette Title}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r Configurations, echo=FALSE, warning=FALSE, include=FALSE}
+library(seednet)
+```
+
+## General information
+
+**seednet** package is oriented toward disease-specific network/graph creation from the STRING database. It uses the original combined scores of the interactions in the STRING database as well as degree-discounted scores that deminish the study bias in the database.
+
+In the following sections we demostrate the disease-specific network/graph creation from original scores and degree-discounted scores of the STIRNG database. Algorithms for graph construction include first neighborhood, shortest path and the greedy search.
+
+Among the available datasets one can choose molecules associated with Alzheimer's disease, Batten disease (juvenile neuronal ceroid lipofuscinosis), diabetes mellitus type 2, epilepsy, Parkinson's disease, schizophrenia or postoperative delirium.
+
+## Datasets
+
+Following datasets contain molecules associated with the phenotype. A list of molecules can be used as a seed for disease-specific graph construction.
+
+**Alzheimer_disease_seeds** - is a seed list of molecules associated with Alzheimer's disease. Number of molecules in the list: `r length(Alzheimer_disease_seeds)`. Example of the molecules in the dataset:
+```{r warning=FALSE}
+head(Alzheimer_disease_seeds)
+```
+
+**Batten_disease_seeds** - is a seed list of molecules associated with Batten disease (juvenile neuronal ceroid lipofuscinosis). Number of molecules in the list: `r length(Batten_disease_seeds)`. Example of the molecules in the dataset:
+```{r warning=FALSE}
+head(Batten_disease_seeds)
+```
+
+**Diabetes_mellitus_type_2_seeds** - is a seed list of molecules associated with diabetes mellitus type 2. Number of molecules in the list: `r length(Diabetes_mellitus_type_2_seeds)`. Example of the molecules in the dataset:
+```{r warning=FALSE}
+head(Diabetes_mellitus_type_2_seeds)
+```
+
+**Epilepsy_seeds** - is a seed list of molecules associated with epilepsy. Number of molecules in the list: `r length(Epilepsy_seeds)`. Example of the molecules in the dataset:
+```{r warning=FALSE}
+head(Epilepsy_seeds)
+```
+
+**Parkinson_disease_seeds** - is a seed list of molecules associated with Parkinson's disease. Number of molecules in the list: `r length(Parkinson_disease_seeds)`. Example of the molecules in the dataset:
+```{r warning=FALSE}
+head(Parkinson_disease_seeds)
+```
+
+**Postoperative_delirium_seeds** - is a seed list of molecules associated with postoperative delirium. Number of molecules in the list: `r length(Postoperative_delirium_seeds)`. Example of the molecules in the dataset:
+```{r warning=FALSE}
+head(Postoperative_delirium_seeds)
+```
+
+**Schizophrenia_seeds** - is a seed list of molecules associated with schizophrenia. Number of molecules in the list: `r length(Schizophrenia_seeds)`. Example of the molecules in the dataset:
+```{r warning=FALSE}
+head(Schizophrenia_seeds)
+```
+
+## STRING protein-protein interactions
+
+### STRING_graph()
+
+**STRING_graph()** creates an igraph object from STRING database. It removes species identifier from the proteins names and returns the largest connected component. Note: you must have an Internet connection to get a STRINGdb reference class.
+
+```{r warning=FALSE}
+library(STRINGdb)
+
+#WARNING: Requires Internet connection
+string_db = STRINGdb$new(version="10", species=9606, score_threshold=500)
+graph <- STRING_graph(string_db)
+print(graph)
+```
+
+### degree_discounted_graph()
+
+**degree_discounted_graph()** reduces the weight of interactions (edges) proportionally to the vertex degree. Degree-discounting was adapted from the notion of reduced adjacency matrix in Laplacian matrix theory. This function requires a graph with weighted edges as an input.
+
+```{r warning=FALSE, eval=FALSE}
+library(STRINGdb)
+
+#WARNING: Requires Internet connection
+string_db <- STRINGdb$new(version="10", species=9606, score_threshold=500)
+graph <- STRING_graph(string_db)
+
+#NOT RUN (takes about 4 hours)
+discounted_graph <- degree_discounted_graph(graph, "combined_score")
+print(discounted_graph)
+```
+
+### convert_to_adjacency_matrix()
+
+**convert_to_adjacency_matrix()** convers the igraph graph object into symmentric adjacency matrix. This function was modified from *as_adjacency_matrix()* function from *igraph* package to yield a faster computation for the large graphs. The graph is represented as symmetric adjacency matrix, where rows and columns correspond to graph vertices.
+
+```{r warning=FALSE}
+library(STRINGdb)
+
+#WARNING: Requires Internet connection
+string_db <- STRINGdb$new(version="10", species=9606, score_threshold=500)
+graph <- STRING_graph(string_db)
+STRING_adj_matrix <- convert_to_adjacency_matrix(graph, "combined_score")
+```
+
+### degree_discounted_matrix()
+
+**degree_discounted_matrix()** reduces the weight of interactions (edges) proportionally to the vertex degree. Degree-discounting was adapted from the notion of reduced adjacency matrix in Laplacian matrix theory. This function requires *adj_matrix* and *alpha* parameter as an input. By default alpha is set to -0.5 as suggested by Satuluri and Parthasarathy (2011).
+
+```{r warning=FALSE, eval=FALSE}
+library(STRINGdb)
+
+#WARNING: Requires Internet connection
+string_db <- STRINGdb$new(version="10", species=9606, score_threshold=500)
+graph <- STRING_graph(string_db)
+STRING_adj_matrix <- convert_to_adjacency_matrix(graph, "combined_score")
+
+#NOT RUN (takes about 4 hours)
+STRING_discounted_matrix <- degree_discounted_matrix(STRING_adj_matrix)
+```
+
+## Algorithms for disease-specific network construction
+
+### greedy_search()
+
+**greedy_search()** creates an igraph graph from the input graph (such as STRING) and set of seeds (see the datasets above). Each step it selects the strongest interacting nodes defined by the edge attribute *attrib_name*. It makes number of steps in the graph as defined by *steps* and retrieves unique nodes not yet added in the previous step.
+
+```{r warning=FALSE}
+library(STRINGdb)
+
+#WARNING: Requires Internet connection
+string_db = STRINGdb$new(version="10", species=9606, score_threshold=500)
+graph <- STRING_graph(string_db)
+seeds_df <- data.frame(genes = Batten_disease_seeds)
+maped_seeds <- string_db$map(seeds_df, "genes")
+
+#Remove the species identifier from the protein names
+seeds <- sapply(strsplit(maped_seeds[!is.na(maped_seeds[,2]),2], '\\.'), "[[", 2)
+Batten_graph <- greedy_search(graph, seeds, 3, "combined_score")
+print(Batten_graph)
+```
+
+### first_neighborhood()
+
+**first_neighborhood()** creates an igraph graph from the input graph (such as STRING) and set of seeds (see the datasets above). It selects all directly connected nodes to the input *seeds* disregarding weights of the edges.
+
+```{r warning=FALSE}
+library(STRINGdb)
+
+#WARNING: Requires Internet connection
+string_db = STRINGdb$new(version="10", species=9606, score_threshold=500)
+graph <- STRING_graph(string_db)
+seeds_df <- data.frame(genes = Batten_disease_seeds)
+maped_seeds <- string_db$map(seeds_df, "genes")
+
+#Remove the species identifier from the protein names
+seeds <- sapply(strsplit(maped_seeds[!is.na(maped_seeds[,2]),2], '\\.'), "[[", 2)
+Batten_graph <- first_neighborhood(graph, seeds)
+print(Batten_graph)
+```
+
+### shortest_path()
+
+**shortest_path()** creates igraph graph from the input *graph* and specified set of vertices *seeds*. This function is a wraper for igraph function *get.shortest.paths()*. 
+In STRING database, the higher combined score indicates the higher evidence (probability) of interaction between proteins, thus for shortest path (which selects the minimal distance between vertices based on the smallest sum of edges weights) we use reversed weights of the STRING graph.
+
+```{r warning=FALSE}
+library(STRINGdb)
+
+#WARNING: Requires Internet connection
+string_db = STRINGdb$new(version="10", species=9606, score_threshold=500)
+graph <- STRING_graph(string_db)
+seeds_df <- data.frame(genes = Batten_disease_seeds)
+maped_seeds <- string_db$map(seeds_df, "genes")
+
+#Remove the species identifier from the protein names
+seeds <- sapply(strsplit(maped_seeds[!is.na(maped_seeds[,2]),2], '\\.'), "[[", 2)
+Batten_graph <- shortest_path(graph, seeds, 1000-igraph::E(graph)$combined_score)
+print(Batten_graph)
+```

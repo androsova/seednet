@@ -1,0 +1,20 @@
+Package: seednet
+Type: Package
+Title: Seed-based network construction
+Version: 0.1.0
+Author: Ganna Androsova
+Maintainer: Ganna Androsova <ganna.androsova@uni.lu>
+Description: seednet package is oriented toward disease-specific network/graph creating from the STRING database. It allows usage of original combined scores for the interactions as well as degree-discounted scores that opt to deminish the study bias in the database.
+Depends: R (>= 3.1.0)
+License: GPL (>= 3)
+Encoding: UTF-8
+LazyData: true
+Suggests:
+    knitr,
+    rmarkdown,
+    testthat
+VignetteBuilder: knitr
+RoxygenNote: 6.1.0
+Imports: 
+    igraph,
+    STRINGdb
